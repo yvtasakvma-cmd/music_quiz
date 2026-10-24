@@ -95,13 +95,30 @@ export function drawKey(remaining = KEYS.map((key) => key.tonic), previous = nul
 }
 
 export function drawDiatonic(remaining = Array.from({ length: 84 }, (_, id) => id), previous = null, random = Math.random) {
-  const pool = remaining.length ? remaining : Array.from({ length: 84 }, (_, id) => id);
-  const choices = pool.filter((id) => id !== previous);
-  const questionId = choices[Math.floor(random() * choices.length)];
+  const { questionId, remaining: rest } = drawQuestionId(84, remaining, previous, random);
   return {
     questionId, key: KEYS[Math.floor(questionId / 7)], degree: questionId % 7,
-    remaining: pool.filter((id) => id !== questionId),
+    remaining: rest,
   };
+}
+
+export function relativeQuestion(questionId) {
+  const fromMajor = questionId < 12;
+  const key = (fromMajor ? KEYS : MINOR_KEYS)[questionId % 12];
+  const target = pitchClass(key.tonic + (fromMajor ? 9 : 3));
+  return { questionId, key, fromMajor, answerKey: (fromMajor ? MINOR_KEYS : KEYS)[target] };
+}
+
+export function drawRelative(remaining = Array.from({ length: 24 }, (_, id) => id), previous = null, random = Math.random) {
+  const draw = drawQuestionId(24, remaining, previous, random);
+  return { ...draw, ...relativeQuestion(draw.questionId) };
+}
+
+function drawQuestionId(total, remaining, previous, random) {
+  const pool = remaining.length ? remaining : Array.from({ length: total }, (_, id) => id);
+  const choices = pool.filter((id) => id !== previous);
+  const questionId = choices[Math.floor(random() * choices.length)];
+  return { questionId, remaining: pool.filter((id) => id !== questionId) };
 }
 
 export function frequency(midi) {

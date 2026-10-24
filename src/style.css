@@ -37,6 +37,7 @@ button svg { width: 21px; height: 21px; flex-shrink: 0; }
 .menu-card:active { transform: translateY(1px); }
 .cadence-card { background: #eef2e8; }
 .diatonic-card { margin-top: 12px; background: #fcf0e7; border-color: #ebded1; }
+.relative-card { margin-top: 12px; background: #edf3f6; border-color: #dce6eb; }
 .diatonic-card .menu-card-title { line-height: 1.6; }
 .diatonic-title { margin: 10px 0 12px; display: flex; align-items: baseline; gap: 10px; }
 #degree-name { font-family: Georgia, serif; font-size: 48px; line-height: 1.2; }

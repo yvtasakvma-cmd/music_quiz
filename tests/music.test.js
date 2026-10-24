@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KEYS, MINOR_KEYS, cadence, diatonicChord, majorScale, naturalMinorScale, canConfirm, isCorrect, noteName, frequency, drawKey, drawDiatonic } from '../src/music.js';
+import { KEYS, MINOR_KEYS, cadence, diatonicChord, majorScale, naturalMinorScale, canConfirm, isCorrect, noteName, frequency, drawKey, drawDiatonic, drawRelative, relativeQuestion } from '../src/music.js';
 
 test('all 12 keys produce ii m7, V7 and I maj7 with the correct intervals', () => {
   for (const key of KEYS) {
@@ -147,5 +147,42 @@ test('diatonic deck randomizes all 84 key-degree pairs without repetition and re
     const next = drawDiatonic(draw.remaining, draw.questionId, () => 0);
     assert.notEqual(next.questionId, draw.questionId);
     assert.equal(next.remaining.length, 83);
+  }
+});
+
+test('all relative major/minor questions share their scale tones and accept either octave', () => {
+  for (let id = 0; id < 24; id++) {
+    const { key, fromMajor, answerKey } = relativeQuestion(id);
+    const source = (fromMajor ? majorScale : naturalMinorScale)(key).map((note) => note.pitch).sort((a, b) => a - b);
+    const target = (fromMajor ? naturalMinorScale : majorScale)(answerKey).map((note) => note.pitch).sort((a, b) => a - b);
+    assert.deepEqual(source, target);
+    const answer = { pitches: [answerKey.tonic] };
+    assert.equal(isCorrect([48 + answerKey.tonic], answer), true);
+    assert.equal(isCorrect([60 + answerKey.tonic], answer), true);
+    assert.equal(isCorrect([48 + (answerKey.tonic + 1) % 12], answer), false);
+    assert.equal(isCorrect([48 + answerKey.tonic, 60 + answerKey.tonic], answer), false);
+    assert.equal(relativeQuestion((fromMajor ? 12 : 0) + answerKey.tonic).answerKey.tonic, key.tonic);
+  }
+  assert.equal(relativeQuestion(0).answerKey.name, 'A'); // C major -> A minor
+  assert.equal(relativeQuestion(21).answerKey.name, 'C'); // A minor -> C major
+  assert.equal(relativeQuestion(1).answerKey.name, 'B♭'); // D-flat major -> B-flat minor
+  assert.equal(relativeQuestion(20).answerKey.name, 'B'); // G-sharp minor -> B major
+});
+
+test('relative deck draws all 24 directions without repeats and starts a fresh round', () => {
+  for (let first = 0; first < 24; first++) {
+    let draw = drawRelative(undefined, undefined, () => (first + 0.1) / 24);
+    assert.equal(draw.questionId, first);
+    const seen = new Set([first]);
+    for (let index = 1; index < 24; index++) {
+      draw = drawRelative(draw.remaining, draw.questionId, () => 0.5);
+      assert.equal(seen.has(draw.questionId), false);
+      assert.equal(draw.remaining.length, 23 - index);
+      seen.add(draw.questionId);
+    }
+    assert.equal(seen.size, 24);
+    const next = drawRelative(draw.remaining, draw.questionId, () => 0);
+    assert.notEqual(next.questionId, draw.questionId);
+    assert.equal(next.remaining.length, 23);
   }
 });

@@ -1,5 +1,5 @@
 import './style.css';
-import { KEYS, MINOR_KEYS, DEGREES, DIATONIC_DEGREES, noteName, cadence, diatonicChord, majorScale, naturalMinorScale, canConfirm, isCorrect, drawKey, drawDiatonic } from './music.js';
+import { KEYS, MINOR_KEYS, DEGREES, DIATONIC_DEGREES, noteName, cadence, diatonicChord, majorScale, naturalMinorScale, canConfirm, isCorrect, drawKey, drawDiatonic, drawRelative, relativeQuestion } from './music.js';
 import { playChord, playScale, stopPlayback } from './audio.js';
 
 const icons = {
@@ -9,7 +9,8 @@ const icons = {
 };
 const MODES = {
   cadence: { label: 'ケーデンスクイズ', count: 4, slots: 3, storage: 'cadence-key-progress-v1' },
-  diatonic: { label: 'メジャーダイアトニッククイズ', count: 4, slots: 1, storage: 'major-diatonic-progress-v1', total: 84 },
+  diatonic: { label: 'メジャーダイアトニッククイズ', count: 4, slots: 1, storage: 'major-diatonic-progress-v1', total: 84, draw: drawDiatonic },
+  relative: { label: '平行短調・長調クイズ', count: 1, slots: 1, storage: 'relative-key-progress-v1', total: 24, draw: drawRelative },
   major: { label: 'メジャースケール', count: 7, slots: 1, storage: 'scale-major-key-progress-v1' },
   minor: { label: 'マイナースケール', count: 7, slots: 1, storage: 'scale-minor-key-progress-v1' },
 };
@@ -20,10 +21,12 @@ let audioBusy = false;
 let feedbackTimer;
 const isCadence = () => mode === 'cadence';
 const isDiatonic = () => mode === 'diatonic';
+const isRelative = () => mode === 'relative';
 const isScale = () => mode === 'major' || mode === 'minor';
 const config = () => MODES[mode];
 const questionCount = () => config().total || KEYS.length;
-const drawQuestion = (remaining, previous) => (isDiatonic() ? drawDiatonic : drawKey)(remaining, previous);
+const drawQuestion = (remaining, previous) => (config().draw || drawKey)(remaining, previous);
+const previousQuestion = () => config().total ? state.questionId : state.key.tonic;
 const selected = () => state.drafts[state.current];
 const quizKey = (key) => mode === 'minor' ? MINOR_KEYS[key.tonic] : key;
 
@@ -39,7 +42,7 @@ function readProgress() {
 }
 function saveProgress() {
   try {
-    localStorage.setItem(config().storage, JSON.stringify({ previous: isDiatonic() ? state.questionId : state.key.tonic, remaining: state.remaining }));
+    localStorage.setItem(config().storage, JSON.stringify({ previous: previousQuestion(), remaining: state.remaining }));
   } catch { /* Keep the non-repeating deck in memory if storage is unavailable. */ }
 }
 function createState() {
@@ -52,6 +55,10 @@ function createState() {
 function items() {
   if (isCadence()) return cadence(state.key);
   if (isDiatonic()) return [diatonicChord(state.key, state.degree)];
+  if (isRelative()) {
+    const { fromMajor, answerKey } = relativeQuestion(state.questionId);
+    return [{ symbol: `${answerKey.name}${fromMajor ? 'マイナー' : 'メジャー'}`, notes: [answerKey.name], pitches: [answerKey.tonic] }];
+  }
   const notes = (mode === 'minor' ? naturalMinorScale : majorScale)(state.key);
   return [{ symbol: `${state.key.name} ${config().label}`, notes: notes.map((note) => note.name), pitches: notes.map((note) => note.pitch) }];
 }
@@ -69,6 +76,7 @@ document.querySelector('#app').innerHTML = `
       <p class="menu-intro">鍵盤で考えて、音でたしかめる。<br>練習したいクイズを選ぼう。</p>
       <button class="menu-card cadence-card" data-mode="cadence"><span class="menu-card-top"><span class="eyebrow">CHORDS</span>${icons.arrow}</span><span class="menu-card-title">ケーデンスクイズ</span><span class="menu-progression">ii <small>m7</small> <i>—</i> V <small>7</small> <i>—</i> I <small>maj7</small></span><span class="menu-card-help">4音のコードを3つつくる</span></button>
       <button class="menu-card diatonic-card" data-mode="diatonic"><span class="menu-card-top"><span class="eyebrow">DIATONIC CHORDS</span>${icons.arrow}</span><span class="menu-card-title">メジャー<br>ダイアトニッククイズ</span><span class="menu-card-help">例：CメジャーのⅡは？<br>12キー × 7度数を、4和音で答える</span></button>
+      <button class="menu-card relative-card" data-mode="relative"><span class="menu-card-top"><span class="eyebrow">RELATIVE KEYS</span>${icons.arrow}</span><span class="menu-card-title">平行短調・長調クイズ</span><span class="menu-card-help">長調から短調、短調から長調へ。<br>相手のキーの主音を1音で答える</span></button>
       <section class="scale-menu" aria-labelledby="scale-menu-title"><div class="scale-menu-heading"><h2 id="scale-menu-title">スケールクイズ</h2><span>7つの音を選ぼう</span></div><div class="scale-options">
         <button class="menu-card scale-card" data-mode="major"><span class="eyebrow">MAJOR</span><span class="scale-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="menu-card-title">メジャー</span><span class="menu-card-help">メジャースケール ${icons.arrow}</span></button>
         <button class="menu-card scale-card minor-card" data-mode="minor"><span class="eyebrow">MINOR</span><span class="scale-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="menu-card-title">マイナー</span><span class="menu-card-help">ナチュラルマイナー ${icons.arrow}</span></button>
@@ -84,6 +92,7 @@ document.querySelector('#app').innerHTML = `
         <p class="progression" aria-label="ツー・ファイブ・ワン"><span>ii<small>m7</small></span><b>—</b><span>V<small>7</small></span><b>—</b><span>I<small>maj7</small></span></p>
         <p id="scale-title" class="scale-title" hidden></p>
         <p id="diatonic-title" class="diatonic-title" hidden><span id="degree-name"></span><span>は？</span></p>
+        <p id="relative-title" class="scale-title" hidden></p>
         <p class="question-help"></p>
       </section>
       <nav class="steps" aria-label="回答するコード">${DEGREES.map((degree, index) => `<button class="step" data-step="${index}" aria-label="${index + 1}つ目 ${degree}"><span class="step-circle"><span>${String(index + 1).padStart(2, '0')}</span></span><span class="step-degree">${degree}</span><span class="step-caption">入力する</span></button>`).join('')}</nav>
@@ -164,19 +173,22 @@ function update() {
   const ready = canConfirm(notes, count);
   const progress = answers.filter(Boolean).length;
   $('#key-name').textContent = key.name;
-  $('.major-label').textContent = isScale() ? 'の' : 'メジャーの';
-  $('#quiz-label').textContent = isCadence() ? 'CADENCE QUIZ / ii–V–I' : isDiatonic() ? 'MAJOR DIATONIC QUIZ' : mode === 'major' ? 'SCALE QUIZ / MAJOR' : 'SCALE QUIZ / NATURAL MINOR';
+  $('.major-label').textContent = isScale() ? 'の' : isRelative() && !relativeQuestion(state.questionId).fromMajor ? 'マイナーの' : 'メジャーの';
+  $('#quiz-label').textContent = isCadence() ? 'CADENCE QUIZ / ii–V–I' : isDiatonic() ? 'MAJOR DIATONIC QUIZ' : isRelative() ? 'RELATIVE KEY QUIZ' : mode === 'major' ? 'SCALE QUIZ / MAJOR' : 'SCALE QUIZ / NATURAL MINOR';
   $('.lesson-number').textContent = `${questionCount() - remaining.length} / ${questionCount()}`;
   $('.progression').hidden = !isCadence();
   $('#scale-title').hidden = !isScale();
   $('#scale-title').textContent = config().label;
   $('#diatonic-title').hidden = !isDiatonic();
   $('#degree-name').textContent = DIATONIC_DEGREES[state.degree] || '';
-  $('.question-help').textContent = isCadence() ? '3つのコードを、鍵盤でつくってみよう。' : isDiatonic() ? 'この度数のダイアトニックコードを4音で答えよう。' : mode === 'minor' ? 'ナチュラルマイナーをつくる7音を選ぼう。' : 'メジャースケールをつくる7音を選ぼう。';
+  $('#relative-title').hidden = !isRelative();
+  $('#relative-title').textContent = isRelative() ? relativeQuestion(state.questionId).fromMajor ? '平行短調は？' : '平行長調は？' : '';
+  $('.question-help').textContent = isCadence() ? '3つのコードを、鍵盤でつくってみよう。' : isDiatonic() ? 'この度数のダイアトニックコードを4音で答えよう。' : isRelative() ? '相手のキーの主音を、鍵盤で1音選ぼう。' : mode === 'minor' ? 'ナチュラルマイナーをつくる7音を選ぼう。' : 'メジャースケールをつくる7音を選ぼう。';
   $('.steps').hidden = !isCadence();
   $('.answer-card').classList.toggle('scale-answer', !isCadence());
   $('.chord-actions').classList.toggle('single', !isCadence());
-  $('#current-degree').textContent = isCadence() ? DEGREES[current] : `${count}つの音`;
+  $('#current-degree').textContent = isCadence() ? DEGREES[current] : isRelative() ? '主音' : `${count}つの音`;
+  $('.answer-heading-sub').textContent = isRelative() ? 'を選ぶ' : 'をつくる';
   $('#note-count').textContent = `${notes.length} / ${count} 音`;
   $('#note-count').classList.toggle('complete', ready);
   document.querySelectorAll('.step').forEach((step, index) => {
@@ -196,16 +208,16 @@ function update() {
     button.setAttribute('aria-label', noteName(midi, key.flats, true));
   });
   $('#selected-notes').innerHTML = notes.length ? [...notes].sort((a, b) => a - b).map((midi) => `<span class="note-chip">${noteName(midi, key.flats)}<small>${Math.floor(midi / 12) - 1}</small></span>`).join('') : `<span class="empty-notes">鍵盤から${count}音を選ぼう</span>`;
-  $('#input-help').textContent = state.feedback || (notes.length === count && !ready ? `同じ音名が重複しています。異なる${count}音を選んでください。` : isCadence() && answers[current] ? '確定しました。丸をタップして他のコードも確認できます。' : '音の並び順・オクターブは自由です。');
+  $('#input-help').textContent = state.feedback || (notes.length === count && !ready ? `同じ音名が重複しています。異なる${count}音を選んでください。` : isCadence() && answers[current] ? '確定しました。丸をタップして他のコードも確認できます。' : isRelative() ? 'オクターブは自由です。別の鍵盤をタップすると選び直せます。' : '音の並び順・オクターブは自由です。');
   $('#play').disabled = notes.length === 0 || audioBusy;
   $('#clear').disabled = notes.length === 0;
   $('#confirm').hidden = !isCadence();
   $('#confirm').disabled = !ready || !!answers[current];
   $('#confirm span').textContent = answers[current] ? '確定済み' : 'OK';
   $('#grade').disabled = (isCadence() ? progress !== 3 : !ready) || result !== null;
-  $('#progress-help').textContent = result ? '音の組み合わせで採点しています' : isCadence() ? progress === 3 ? '準備できました。3つのコードを採点しよう。' : `あと ${3 - progress} つのコードを OK で確定` : ready ? `${count}つの音がそろいました。回答してみよう。` : `異なる${count}音を選んで「回答する」を押そう`;
-  $('#footer-label').textContent = isCadence() ? 'ii–V–I / MAJOR SEVENTH CHORDS' : isDiatonic() ? 'MAJOR DIATONIC / SEVENTH CHORDS' : mode === 'major' ? 'MAJOR SCALE / 7 NOTES' : 'NATURAL MINOR SCALE / 7 NOTES';
-  $('#mode-help').textContent = isCadence() ? '各コードの異なる4音を選び、OK で確定します。黄色の丸は回答済み。丸をタップすると戻って編集できます。3つを確定してから「回答する」を押します。' : isDiatonic() ? 'キーとⅠ〜Ⅶの度数からダイアトニックコードを考え、異なる4音を選んで「回答する」を押します。「鳴らす」で和音を確認できます。12キー×7度数の84問を重複なく出題します。' : 'スケールを構成する異なる7音を選び、「回答する」で採点します。「鳴らす」では選択した音を低い順に再生します。マイナーはナチュラルマイナーです。';
+  $('#progress-help').textContent = result ? isRelative() ? '音名で採点しています。オクターブは自由です。' : '音の組み合わせで採点しています' : isCadence() ? progress === 3 ? '準備できました。3つのコードを採点しよう。' : `あと ${3 - progress} つのコードを OK で確定` : ready ? `${count}つの音を選びました。回答してみよう。` : isRelative() ? '主音を1音選んで「回答する」を押そう' : `異なる${count}音を選んで「回答する」を押そう`;
+  $('#footer-label').textContent = isCadence() ? 'ii–V–I / MAJOR SEVENTH CHORDS' : isDiatonic() ? 'MAJOR DIATONIC / SEVENTH CHORDS' : isRelative() ? 'RELATIVE MAJOR & MINOR / 1 NOTE' : mode === 'major' ? 'MAJOR SCALE / 7 NOTES' : 'NATURAL MINOR SCALE / 7 NOTES';
+  $('#mode-help').textContent = isCadence() ? '各コードの異なる4音を選び、OK で確定します。黄色の丸は回答済み。丸をタップすると戻って編集できます。3つを確定してから「回答する」を押します。' : isDiatonic() ? 'キーとⅠ〜Ⅶの度数からダイアトニックコードを考え、異なる4音を選んで「回答する」を押します。「鳴らす」で和音を確認できます。12キー×7度数の84問を重複なく出題します。' : isRelative() ? '長調の平行短調、短調の平行長調を考え、相手のキーの主音を1音選んで「回答する」を押します。オクターブは自由です。両方向の24問を重複なく出題します。' : 'スケールを構成する異なる7音を選び、「回答する」で採点します。「鳴らす」では選択した音を低い順に再生します。マイナーはナチュラルマイナーです。';
   renderResults();
 }
 function renderResults() {
@@ -228,6 +240,7 @@ $('#keyboard').addEventListener('click', (event) => {
   const midi = Number(button.dataset.midi);
   const notes = selected();
   if (notes.includes(midi)) state.drafts[state.current] = notes.filter((note) => note !== midi);
+  else if (isRelative()) state.drafts[state.current] = [midi];
   else if (notes.length < config().count) state.drafts[state.current] = [...notes, midi];
   else { notify(`${config().count}音まで選べます。選択した鍵盤をタップすると解除できます。`); return; }
   editCurrent();
@@ -294,7 +307,7 @@ $('#results').addEventListener('click', (event) => {
   }
   if (event.target.closest('#next') || event.target.closest('#retry')) {
     if (event.target.closest('#next')) {
-      const next = drawQuestion(state.remaining, isDiatonic() ? state.questionId : state.key.tonic);
+      const next = drawQuestion(state.remaining, previousQuestion());
       state.remaining = next.remaining;
       state.degree = next.degree;
       state.questionId = next.questionId;
