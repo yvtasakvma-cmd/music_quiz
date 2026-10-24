@@ -114,8 +114,6 @@ function update() {
     button.setAttribute('aria-pressed', String(pressed));
     button.classList.toggle('selected', pressed);
     button.setAttribute('aria-label', noteName(midi, key.flats, true));
-    const name = noteName(midi, key.flats);
-    button.innerHTML = `<span>${name}${midi % 12 === 0 ? `<small>${Math.floor(midi / 12) - 1}</small>` : ''}</span>`;
   });
   $('#selected-notes').innerHTML = selected.length ? [...selected].sort((a, b) => a - b).map((midi) => `<span class="note-chip">${noteName(midi, key.flats)}<small>${Math.floor(midi / 12) - 1}</small></span>`).join('') : '<span class="empty-notes">鍵盤から4音を選ぼう</span>';
   $('#input-help').textContent = feedback || (selected.length === 4 && !canConfirm(selected) ? '同じ音名が重複しています。異なる4音を選んでください。' : answers[current] ? '確定しました。丸をタップして他のコードも確認できます。' : '音の並び順・オクターブは自由です。');
