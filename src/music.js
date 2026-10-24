@@ -62,9 +62,11 @@ export function isCorrect(notes, chord) {
   return canConfirm(notes) && chord.pitches.every((pitch) => notes.some((note) => pitchClass(note) === pitch));
 }
 
-export function nextKey(current, random = Math.random) {
-  const choices = KEYS.filter((key) => key.tonic !== current.tonic);
-  return choices[Math.floor(random() * choices.length)];
+export function drawKey(remaining = KEYS.map((key) => key.tonic), previous = null, random = Math.random) {
+  const pool = remaining.length ? remaining : KEYS.map((key) => key.tonic);
+  const choices = pool.filter((tonic) => tonic !== previous);
+  const tonic = choices[Math.floor(random() * choices.length)];
+  return { key: KEYS[tonic], remaining: pool.filter((item) => item !== tonic) };
 }
 
 export function frequency(midi) {

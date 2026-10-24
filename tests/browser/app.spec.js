@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => { Math.random = () => 1.1 / 12; });
+});
+
 async function selectNotes(page, notes) {
   for (const midi of notes) await page.locator(`[data-midi="${midi}"]`).tap();
 }
@@ -86,8 +90,8 @@ test('three chords are graded, answer audio works, retry and next question reset
 });
 
 test('incorrect chords show expected notes and editing invalidates the grade', async ({ page }) => {
+  await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('/');
-  await page.locator('#key-select').selectOption('0');
   await submitChord(page, [48, 52, 55, 59]); // Incorrect ii: Cmaj7 instead of Dm7
   await submitChord(page, [50, 53, 55, 59]); // Correct V: G7, inverted
   await submitChord(page, [48, 52, 55, 59]); // Correct I: Cmaj7
@@ -140,6 +144,7 @@ test('PWA precaches and runs a complete quiz after an offline reload', async ({ 
     await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller) await new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
   });
+  await page.evaluate(() => localStorage.clear());
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('D♭');
@@ -149,4 +154,27 @@ test('PWA precaches and runs a complete quiz after an offline reload', async ({ 
   await page.locator('#grade').tap();
   await expect(page.locator('#results')).toContainText('すべて正解！');
   await context.setOffline(false);
+});
+
+test('quiz has no key picker and never repeats a key before completing the round, including after reload', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.goto('/');
+  await expect(page.locator('select')).toHaveCount(0);
+  const seen = new Set([await page.locator('#key-name').textContent()]);
+  await page.reload();
+  for (let question = 2; question <= 12; question++) {
+    const name = await page.locator('#key-name').textContent();
+    expect(seen.has(name)).toBe(false);
+    seen.add(name);
+    await expect(page.locator('.lesson-number')).toHaveText(`${question} / 12`);
+    for (let chord = 0; chord < 3; chord++) await submitChord(page, [48, 52, 55, 59]);
+    await page.locator('#grade').tap();
+    if (question === 12) await expect(page.locator('#next')).toContainText('次の12問へ');
+    await page.locator('#next').tap();
+    if (question === 12) {
+      await expect(page.locator('.lesson-number')).toHaveText('1 / 12');
+      await expect(page.locator('#key-name')).not.toHaveText(name);
+    }
+  }
+  expect(seen.size).toBe(12);
 });

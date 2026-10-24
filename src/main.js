@@ -1,5 +1,5 @@
 import './style.css';
-import { KEYS, DEGREES, noteName, cadence, canConfirm, isCorrect, nextKey } from './music.js';
+import { KEYS, DEGREES, noteName, cadence, canConfirm, isCorrect, drawKey } from './music.js';
 import { playChord } from './audio.js';
 
 const icons = {
@@ -8,7 +8,24 @@ const icons = {
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
-let key = KEYS[1];
+const PROGRESS_KEY = 'cadence-key-progress-v1';
+function readProgress() {
+  try {
+    const progress = JSON.parse(localStorage.getItem(PROGRESS_KEY));
+    if (progress && Number.isInteger(progress.previous) && KEYS[progress.previous] &&
+      Array.isArray(progress.remaining) && new Set(progress.remaining).size === progress.remaining.length &&
+      progress.remaining.every((tonic) => Number.isInteger(tonic) && KEYS[tonic] && tonic !== progress.previous)) return progress;
+  } catch { /* Practice still works when browser storage is unavailable. */ }
+  return {};
+}
+const progress = readProgress();
+let { key, remaining } = drawKey(progress.remaining, progress.previous);
+function saveProgress() {
+  try {
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify({ previous: key.tonic, remaining }));
+  } catch { /* Keep the non-repeating deck in memory if storage is unavailable. */ }
+}
+saveProgress();
 let current = 0;
 let drafts = [[], [], []];
 let answers = [null, null, null];
@@ -25,8 +42,8 @@ document.querySelector('#app').innerHTML = `
     </header>
 
     <section class="question" aria-labelledby="question-title">
-      <div class="eyebrow"><span class="tiny-dot"></span> CHORD PRACTICE <span class="lesson-number">01</span></div>
-      <div class="question-top"><h1 id="question-title"><span id="key-name"></span><span class="major-label">メジャーの</span></h1><label class="key-picker">キー変更<select id="key-select" aria-label="出題キー">${KEYS.map((item, index) => `<option value="${index}" ${index === 1 ? 'selected' : ''}>${item.name} メジャー</option>`).join('')}</select><span aria-hidden="true">⌄</span></label></div>
+      <div class="eyebrow"><span class="tiny-dot"></span> CHORD PRACTICE <span class="lesson-number" aria-label="この周の出題数"></span></div>
+      <div class="question-top"><h1 id="question-title" tabindex="-1"><span id="key-name"></span><span class="major-label">メジャーの</span></h1></div>
       <p class="progression" aria-label="ツー・ファイブ・ワン"><span>ii<small>m7</small></span><b>—</b><span>V<small>7</small></span><b>—</b><span>I<small>maj7</small></span></p>
       <p class="question-help">3つのコードを、鍵盤でつくってみよう。</p>
     </section>
@@ -76,6 +93,7 @@ function notify(message) {
 
 function update() {
   $('#key-name').textContent = key.name;
+  $('.lesson-number').textContent = `${KEYS.length - remaining.length} / ${KEYS.length}`;
   $('#current-degree').textContent = DEGREES[current];
   const selected = drafts[current];
   $('#note-count').textContent = `${selected.length} / 4 音`;
@@ -115,7 +133,7 @@ function renderResults() {
   if (!result) return;
   const chords = cadence(key);
   const count = result.filter(Boolean).length;
-  $('#results').innerHTML = `<div class="result-heading"><span class="eyebrow">RESULT</span><h2>${count === 3 ? 'すべて正解！' : 'あと少し。音を見比べよう。'}</h2><p>${count} / 3 コード正解${count === 3 ? ' · 次のキーにも挑戦しよう。' : ''}</p></div><div class="result-chords">${chords.map((chord, index) => `<div class="result-chord ${result[index] ? 'is-correct' : 'is-incorrect'}"><span class="result-icon" aria-label="${result[index] ? '正解' : '不正解'}">${result[index] ? '✓' : '×'}</span><div><div class="result-chord-title"><span>${DEGREES[index]}</span><strong>${chord.symbol}</strong></div><p class="expected-notes">正解：${chord.notes.join(' · ')}</p>${result[index] ? '' : `<p class="your-notes">回答：${[...answers[index]].sort((a, b) => a - b).map((midi) => noteName(midi, key.flats)).join(' · ')}</p>`}</div><button class="listen-answer" data-listen="${index}" aria-label="正解の ${chord.symbol} を聴く">${icons.sound}</button></div>`).join('')}</div><div class="result-actions"><button id="retry" class="button retry-button">同じキーでもう一度</button><button id="next" class="button confirm-button">次の問題 ${icons.arrow}</button></div>`;
+  $('#results').innerHTML = `<div class="result-heading"><span class="eyebrow">RESULT</span><h2>${count === 3 ? 'すべて正解！' : 'あと少し。音を見比べよう。'}</h2><p>${count} / 3 コード正解${count === 3 ? ' · 次のキーにも挑戦しよう。' : ''}</p></div><div class="result-chords">${chords.map((chord, index) => `<div class="result-chord ${result[index] ? 'is-correct' : 'is-incorrect'}"><span class="result-icon" aria-label="${result[index] ? '正解' : '不正解'}">${result[index] ? '✓' : '×'}</span><div><div class="result-chord-title"><span>${DEGREES[index]}</span><strong>${chord.symbol}</strong></div><p class="expected-notes">正解：${chord.notes.join(' · ')}</p>${result[index] ? '' : `<p class="your-notes">回答：${[...answers[index]].sort((a, b) => a - b).map((midi) => noteName(midi, key.flats)).join(' · ')}</p>`}</div><button class="listen-answer" data-listen="${index}" aria-label="正解の ${chord.symbol} を聴く">${icons.sound}</button></div>`).join('')}</div><div class="result-actions"><button id="retry" class="button retry-button">同じキーでもう一度</button><button id="next" class="button confirm-button">${remaining.length ? '次の問題' : '次の12問へ'} ${icons.arrow}</button></div>`;
 }
 
 function editCurrent() {
@@ -200,15 +218,10 @@ function reset(newKey = key) {
   answers = [null, null, null];
   result = null;
   feedback = '';
-  $('#key-select').value = KEYS.indexOf(key);
   clearTimeout(feedbackTimer);
   $('#toast').hidden = true;
   update();
 }
-
-$('#key-select').addEventListener('change', (event) => {
-  reset(KEYS[Number(event.target.value)]);
-});
 
 $('#results').addEventListener('click', (event) => {
   const listen = event.target.closest('[data-listen]');
@@ -219,9 +232,16 @@ $('#results').addEventListener('click', (event) => {
     return;
   }
   if (event.target.closest('#next') || event.target.closest('#retry')) {
-    reset(event.target.closest('#next') ? nextKey(key) : key);
+    if (event.target.closest('#next')) {
+      const next = drawKey(remaining, key.tonic);
+      remaining = next.remaining;
+      reset(next.key);
+      saveProgress();
+    } else {
+      reset();
+    }
     $('.question').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    $('#key-select').focus({ preventScroll: true });
+    $('#question-title').focus({ preventScroll: true });
   }
 });
 
