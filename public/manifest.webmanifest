@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Cadence — ii–V–I の練習",
+  "name": "Cadence — コードとスケールの音楽クイズ",
   "short_name": "Cadence",
-  "description": "鍵盤で和音をつくる、ii–V–I の音楽クイズ",
+  "description": "鍵盤で学ぶ、ii–V–I とメジャー・マイナースケールのクイズ",
   "lang": "ja",
   "start_url": "./",
   "scope": "./",

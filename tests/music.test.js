@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KEYS, cadence, majorScale, canConfirm, isCorrect, noteName, frequency, drawKey } from '../src/music.js';
+import { KEYS, MINOR_KEYS, cadence, majorScale, naturalMinorScale, canConfirm, isCorrect, noteName, frequency, drawKey } from '../src/music.js';
 
 test('all 12 keys produce ii m7, V7 and I maj7 with the correct intervals', () => {
   for (const key of KEYS) {
@@ -78,4 +78,34 @@ test('random first question can be any key, with no repeats for all 12 questions
     assert.notEqual(next.key.tonic, previous);
     assert.equal(next.remaining.length, 11);
   }
+});
+
+test('major and natural minor scales have the right seven pitches in all 12 keys', () => {
+  for (const [keys, scale, intervals] of [
+    [KEYS, majorScale, [0, 2, 4, 5, 7, 9, 11]],
+    [MINOR_KEYS, naturalMinorScale, [0, 2, 3, 5, 7, 8, 10]],
+  ]) {
+    for (const key of keys) {
+      const notes = scale(key);
+      const expected = intervals.map((interval) => (key.tonic + interval) % 12);
+      assert.deepEqual(notes.map((note) => note.pitch), expected);
+      assert.equal(new Set(notes.map((note) => note.name[0])).size, 7);
+      assert.equal(notes.some((note) => /♭♭|♯♯/.test(note.name)), false);
+      const target = { pitches: expected };
+      const voicing = [...expected].reverse().map((pitch, i) => pitch + (i % 2 ? 48 : 60));
+      assert.equal(isCorrect(voicing, target), true);
+      assert.equal(isCorrect(voicing.slice(1), target), false);
+      assert.equal(isCorrect([...voicing, voicing[0] + 12], target), false);
+      assert.equal(isCorrect([...voicing.slice(1), voicing[1] + 12], target), false);
+    }
+  }
+});
+
+test('minor uses natural minor pitches and conventional spellings', () => {
+  assert.deepEqual(naturalMinorScale(MINOR_KEYS[9]).map((note) => note.name), ['A', 'B', 'C', 'D', 'E', 'F', 'G']);
+  assert.deepEqual(naturalMinorScale(MINOR_KEYS[0]).map((note) => note.name), ['C', 'D', 'E♭', 'F', 'G', 'A♭', 'B♭']);
+  assert.deepEqual(naturalMinorScale(MINOR_KEYS[1]).map((note) => note.name), ['C♯', 'D♯', 'E', 'F♯', 'G♯', 'A', 'B']);
+  const minor = { pitches: naturalMinorScale(MINOR_KEYS[9]).map((note) => note.pitch) };
+  assert.equal(isCorrect([57, 59, 60, 62, 64, 65, 68], minor), false); // harmonic minor
+  assert.equal(isCorrect([57, 59, 60, 62, 64, 66, 68], minor), false); // melodic minor
 });

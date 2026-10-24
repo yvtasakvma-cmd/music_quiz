@@ -14,11 +14,17 @@ export const KEYS = [
 ];
 
 export const DEGREES = ['ii m7', 'V7', 'I maj7'];
+export const MINOR_KEYS = KEYS.map((key) => ({
+  ...key,
+  name: ({ 1: 'C♯', 6: 'F♯', 8: 'G♯' })[key.tonic] || key.name,
+  flats: [0, 2, 3, 5, 7, 10].includes(key.tonic),
+}));
 const SHARPS = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 const FLATS = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const NATURALS = [0, 2, 4, 5, 7, 9, 11];
 const SCALE = [0, 2, 4, 5, 7, 9, 11];
+const MINOR_SCALE = [0, 2, 3, 5, 7, 8, 10];
 const CHORD_DEGREES = [[1, 3, 5, 0], [4, 6, 1, 3], [0, 2, 4, 6]];
 
 export function pitchClass(midi) {
@@ -32,8 +38,16 @@ export function noteName(midi, flats = true, octave = false) {
 
 // Spell scale tones diatonically, including C♭ in G♭ major.
 export function majorScale(key) {
+  return spellScale(key, SCALE);
+}
+
+export function naturalMinorScale(key) {
+  return spellScale(key, MINOR_SCALE);
+}
+
+function spellScale(key, intervals) {
   const first = LETTERS.indexOf(key.name[0]);
-  return SCALE.map((offset, index) => {
+  return intervals.map((offset, index) => {
     const letter = (first + index) % 7;
     const pitch = pitchClass(key.tonic + offset);
     let alteration = pitchClass(pitch - NATURALS[letter]);
@@ -54,12 +68,12 @@ export function cadence(key) {
   });
 }
 
-export function canConfirm(notes) {
-  return notes.length === 4 && new Set(notes.map(pitchClass)).size === 4;
+export function canConfirm(notes, count = 4) {
+  return notes.length === count && new Set(notes.map(pitchClass)).size === count;
 }
 
 export function isCorrect(notes, chord) {
-  return canConfirm(notes) && chord.pitches.every((pitch) => notes.some((note) => pitchClass(note) === pitch));
+  return canConfirm(notes, chord.pitches.length) && chord.pitches.every((pitch) => notes.some((note) => pitchClass(note) === pitch));
 }
 
 export function drawKey(remaining = KEYS.map((key) => key.tonic), previous = null, random = Math.random) {

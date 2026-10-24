@@ -4,6 +4,11 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 1.1 / 12; });
 });
 
+async function openCadence(page) {
+  await page.goto('/');
+  await page.locator('[data-mode="cadence"]').tap();
+}
+
 async function selectNotes(page, notes) {
   for (const midi of notes) await page.locator(`[data-midi="${midi}"]`).tap();
 }
@@ -29,7 +34,7 @@ test('portrait layout, toggle, simultaneous playback and answer confirmation', a
       return oscillator;
     };
   });
-  await page.goto('/');
+  await openCadence(page);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('D♭');
   await expect(page.locator('.piano-key')).toHaveCount(24);
   await expect(page.locator('#grade')).toBeDisabled();
@@ -63,7 +68,7 @@ test('portrait layout, toggle, simultaneous playback and answer confirmation', a
 });
 
 test('three chords are graded, answer audio works, retry and next question reset state', async ({ page }) => {
-  await page.goto('/');
+  await openCadence(page);
   await submitChord(page, [51, 54, 58, 61]);
   await submitChord(page, [48, 51, 54, 56]);
   await expect(page.locator('#grade')).toBeDisabled();
@@ -91,7 +96,7 @@ test('three chords are graded, answer audio works, retry and next question reset
 
 test('incorrect chords show expected notes and editing invalidates the grade', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0; });
-  await page.goto('/');
+  await openCadence(page);
   await submitChord(page, [48, 52, 55, 59]); // Incorrect ii: Cmaj7 instead of Dm7
   await submitChord(page, [50, 53, 55, 59]); // Correct V: G7, inverted
   await submitChord(page, [48, 52, 55, 59]); // Correct I: Cmaj7
@@ -109,7 +114,7 @@ test('incorrect chords show expected notes and editing invalidates the grade', a
 });
 
 test('duplicate pitch classes cannot be confirmed, and fifth notes are rejected', async ({ page }) => {
-  await page.goto('/');
+  await openCadence(page);
   await selectNotes(page, [48, 52, 55, 60]);
   await expect(page.locator('#input-help')).toContainText('重複');
   await expect(page.locator('#confirm')).toBeDisabled();
@@ -123,7 +128,7 @@ test('duplicate pitch classes cannot be confirmed, and fifth notes are rejected'
 
 test('320px iPhone layout has no horizontal overflow and all controls are reachable', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/');
+  await openCadence(page);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const keyboard = await page.locator('#keyboard').boundingBox();
   expect(keyboard.x).toBeGreaterThanOrEqual(0);
@@ -139,7 +144,7 @@ test('PWA precaches and runs a complete quiz after an offline reload', async ({ 
   const manifest = await (await request.get('/manifest.webmanifest')).json();
   expect(manifest.display).toBe('standalone');
   expect(manifest.icons.some((icon) => icon.sizes === '512x512')).toBe(true);
-  await page.goto('/');
+  await openCadence(page);
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller) await new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
@@ -147,6 +152,7 @@ test('PWA precaches and runs a complete quiz after an offline reload', async ({ 
   await page.evaluate(() => localStorage.clear());
   await context.setOffline(true);
   await page.reload();
+  await page.locator('[data-mode="cadence"]').tap();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('D♭');
   await submitChord(page, [51, 54, 58, 61]);
   await submitChord(page, [48, 51, 54, 56]);
@@ -158,10 +164,11 @@ test('PWA precaches and runs a complete quiz after an offline reload', async ({ 
 
 test('quiz has no key picker and never repeats a key before completing the round, including after reload', async ({ page }) => {
   test.setTimeout(90000);
-  await page.goto('/');
+  await openCadence(page);
   await expect(page.locator('select')).toHaveCount(0);
   const seen = new Set([await page.locator('#key-name').textContent()]);
   await page.reload();
+  await page.locator('[data-mode="cadence"]').tap();
   for (let question = 2; question <= 12; question++) {
     const name = await page.locator('#key-name').textContent();
     expect(seen.has(name)).toBe(false);

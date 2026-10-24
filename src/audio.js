@@ -4,6 +4,18 @@ let context;
 let stopPrevious;
 
 export async function playChord(notes) {
+  return playNotes(notes, false);
+}
+
+export async function playScale(notes) {
+  return playNotes(notes, true);
+}
+
+export function stopPlayback() {
+  stopPrevious?.();
+}
+
+async function playNotes(notes, sequential) {
   if (!notes.length) return;
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) throw new Error('このブラウザは音声再生に対応していません。');
@@ -14,22 +26,24 @@ export async function playChord(notes) {
   const now = context.currentTime;
   const voices = [];
   const master = context.createGain();
-  master.gain.value = 0.32 / Math.sqrt(notes.length);
+  master.gain.value = sequential ? 0.32 : 0.32 / Math.sqrt(notes.length);
   master.connect(context.destination);
 
-  for (const note of notes) {
+  for (const [index, note] of notes.entries()) {
+    const start = now + (sequential ? index * 0.3 : 0);
+    const duration = sequential ? 0.55 : 1.8;
     const envelope = context.createGain();
-    envelope.gain.setValueAtTime(0, now);
-    envelope.gain.linearRampToValueAtTime(0.7, now + 0.015);
-    envelope.gain.exponentialRampToValueAtTime(0.2, now + 0.4);
-    envelope.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+    envelope.gain.setValueAtTime(0, start);
+    envelope.gain.linearRampToValueAtTime(0.7, start + 0.015);
+    envelope.gain.exponentialRampToValueAtTime(0.2, start + (sequential ? 0.2 : 0.4));
+    envelope.gain.exponentialRampToValueAtTime(0.001, start + duration);
     envelope.connect(master);
     const oscillator = context.createOscillator();
     oscillator.type = 'triangle';
     oscillator.frequency.value = frequency(note);
     oscillator.connect(envelope);
-    oscillator.start(now);
-    oscillator.stop(now + 1.85);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.05);
     voices.push(oscillator);
   }
   let remaining = voices.length;
