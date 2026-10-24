@@ -73,7 +73,7 @@ export function diatonicChord(key, degree) {
   const scale = majorScale(key);
   const notes = [0, 2, 4, 6].map((offset) => scale[(degree + offset) % 7]);
   return {
-    symbol: notes[0].name + ['maj7', 'm7', 'm7', 'maj7', '7', 'm7', 'm7♭5'][degree],
+    symbol: notes[0].name + ['maj7', 'm7', 'm7', 'maj7', '7', 'm7', 'm7♭5'][degree] + (degree === 6 ? `（${notes[0].name}ø7）` : ''),
     notes: notes.map((note) => note.name),
     pitches: notes.map((note) => note.pitch),
   };

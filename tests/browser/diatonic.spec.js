@@ -16,7 +16,7 @@ for (const [degree, numeral, notes, symbol] of [
   [3, 'Ⅳ', [48, 52, 53, 57], 'Fmaj7'],
   [4, 'Ⅴ', [50, 53, 55, 59], 'G7'],
   [5, 'Ⅵ', [48, 52, 55, 57], 'Am7'],
-  [6, 'Ⅶ', [50, 53, 57, 59], 'Bm7♭5'],
+  [6, 'Ⅶ', [50, 53, 57, 59], 'Bm7♭5（Bø7）'],
 ]) {
   test(`C major degree ${numeral} accepts the seventh chord ${symbol}`, async ({ page }) => {
     await openDiatonic(page, degree);

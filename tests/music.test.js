@@ -126,7 +126,7 @@ test('all 84 diatonic seventh chords have the right quality and accept inversion
       }
     }
   }
-  assert.deepEqual(Array.from({ length: 7 }, (_, degree) => diatonicChord(KEYS[0], degree).symbol), ['Cmaj7', 'Dm7', 'Em7', 'Fmaj7', 'G7', 'Am7', 'Bm7♭5']);
+  assert.deepEqual(Array.from({ length: 7 }, (_, degree) => diatonicChord(KEYS[0], degree).symbol), ['Cmaj7', 'Dm7', 'Em7', 'Fmaj7', 'G7', 'Am7', 'Bm7♭5（Bø7）']);
   assert.deepEqual(diatonicChord(KEYS[0], 1).notes, ['D', 'F', 'A', 'C']);
   assert.deepEqual(diatonicChord(KEYS[6], 3).notes, ['C♭', 'E♭', 'G♭', 'B♭']);
 });
