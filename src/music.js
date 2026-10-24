@@ -14,6 +14,7 @@ export const KEYS = [
 ];
 
 export const DEGREES = ['ii m7', 'V7', 'I maj7'];
+export const DIATONIC_DEGREES = ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ', 'Ⅶ'];
 export const MINOR_KEYS = KEYS.map((key) => ({
   ...key,
   name: ({ 1: 'C♯', 6: 'F♯', 8: 'G♯' })[key.tonic] || key.name,
@@ -68,6 +69,16 @@ export function cadence(key) {
   });
 }
 
+export function diatonicChord(key, degree) {
+  const scale = majorScale(key);
+  const notes = [0, 2, 4, 6].map((offset) => scale[(degree + offset) % 7]);
+  return {
+    symbol: notes[0].name + ['maj7', 'm7', 'm7', 'maj7', '7', 'm7', 'm7♭5'][degree],
+    notes: notes.map((note) => note.name),
+    pitches: notes.map((note) => note.pitch),
+  };
+}
+
 export function canConfirm(notes, count = 4) {
   return notes.length === count && new Set(notes.map(pitchClass)).size === count;
 }
@@ -81,6 +92,16 @@ export function drawKey(remaining = KEYS.map((key) => key.tonic), previous = nul
   const choices = pool.filter((tonic) => tonic !== previous);
   const tonic = choices[Math.floor(random() * choices.length)];
   return { key: KEYS[tonic], remaining: pool.filter((item) => item !== tonic) };
+}
+
+export function drawDiatonic(remaining = Array.from({ length: 84 }, (_, id) => id), previous = null, random = Math.random) {
+  const pool = remaining.length ? remaining : Array.from({ length: 84 }, (_, id) => id);
+  const choices = pool.filter((id) => id !== previous);
+  const questionId = choices[Math.floor(random() * choices.length)];
+  return {
+    questionId, key: KEYS[Math.floor(questionId / 7)], degree: questionId % 7,
+    remaining: pool.filter((id) => id !== questionId),
+  };
 }
 
 export function frequency(midi) {

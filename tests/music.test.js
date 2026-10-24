@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KEYS, MINOR_KEYS, cadence, majorScale, naturalMinorScale, canConfirm, isCorrect, noteName, frequency, drawKey } from '../src/music.js';
+import { KEYS, MINOR_KEYS, cadence, diatonicChord, majorScale, naturalMinorScale, canConfirm, isCorrect, noteName, frequency, drawKey, drawDiatonic } from '../src/music.js';
 
 test('all 12 keys produce ii m7, V7 and I maj7 with the correct intervals', () => {
   for (const key of KEYS) {
@@ -108,4 +108,44 @@ test('minor uses natural minor pitches and conventional spellings', () => {
   const minor = { pitches: naturalMinorScale(MINOR_KEYS[9]).map((note) => note.pitch) };
   assert.equal(isCorrect([57, 59, 60, 62, 64, 65, 68], minor), false); // harmonic minor
   assert.equal(isCorrect([57, 59, 60, 62, 64, 66, 68], minor), false); // melodic minor
+});
+
+test('all 84 diatonic seventh chords have the right quality and accept inversions', () => {
+  const roots = [0, 2, 4, 5, 7, 9, 11];
+  const qualities = [[0, 4, 7, 11], [0, 3, 7, 10], [0, 3, 7, 10], [0, 4, 7, 11], [0, 4, 7, 10], [0, 3, 7, 10], [0, 3, 6, 10]];
+  for (const key of KEYS) {
+    for (let degree = 0; degree < 7; degree++) {
+      const chord = diatonicChord(key, degree);
+      const expected = qualities[degree].map((interval) => (key.tonic + roots[degree] + interval) % 12);
+      assert.deepEqual(chord.pitches, expected, `${key.name}, degree ${degree + 1}`);
+      assert.equal(new Set(chord.notes.map((note) => note[0])).size, 4);
+      for (let inversion = 0; inversion < 4; inversion++) {
+        const notes = [...expected.slice(inversion), ...expected.slice(0, inversion)].map((pitch, i) => pitch + (i % 2 ? 48 : 60));
+        assert.equal(isCorrect(notes, chord), true);
+      }
+    }
+  }
+  assert.deepEqual(Array.from({ length: 7 }, (_, degree) => diatonicChord(KEYS[0], degree).symbol), ['Cmaj7', 'Dm7', 'Em7', 'Fmaj7', 'G7', 'Am7', 'Bm7♭5']);
+  assert.deepEqual(diatonicChord(KEYS[0], 1).notes, ['D', 'F', 'A', 'C']);
+  assert.deepEqual(diatonicChord(KEYS[6], 3).notes, ['C♭', 'E♭', 'G♭', 'B♭']);
+});
+
+test('diatonic deck randomizes all 84 key-degree pairs without repetition and restarts safely', () => {
+  for (let first = 0; first < 84; first++) {
+    const initial = drawDiatonic(undefined, undefined, () => (first + 0.1) / 84);
+    assert.equal(initial.questionId, first);
+    let draw = initial;
+    const seen = new Set([first]);
+    for (let index = 1; index < 84; index++) {
+      draw = drawDiatonic(draw.remaining, draw.questionId, () => 0.5);
+      assert.equal(seen.has(draw.questionId), false);
+      assert.equal(draw.key.tonic * 7 + draw.degree, draw.questionId);
+      assert.equal(draw.remaining.length, 83 - index);
+      seen.add(draw.questionId);
+    }
+    assert.equal(seen.size, 84);
+    const next = drawDiatonic(draw.remaining, draw.questionId, () => 0);
+    assert.notEqual(next.questionId, draw.questionId);
+    assert.equal(next.remaining.length, 83);
+  }
 });

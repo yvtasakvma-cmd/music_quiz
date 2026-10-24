@@ -36,6 +36,11 @@ button svg { width: 21px; height: 21px; flex-shrink: 0; }
 .menu-card { width: 100%; display: flex; flex-direction: column; align-items: flex-start; text-align: left; border: 1px solid #dce2d4; border-radius: 14px; background: white; padding: 20px; gap: 10px; }
 .menu-card:active { transform: translateY(1px); }
 .cadence-card { background: #eef2e8; }
+.diatonic-card { margin-top: 12px; background: #fcf0e7; border-color: #ebded1; }
+.diatonic-card .menu-card-title { line-height: 1.6; }
+.diatonic-title { margin: 10px 0 12px; display: flex; align-items: baseline; gap: 10px; }
+#degree-name { font-family: Georgia, serif; font-size: 48px; line-height: 1.2; }
+.diatonic-title > span:last-child { font-size: 21px; font-weight: 550; }
 .menu-card-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
 .menu-card-top svg { width: 18px; height: 18px; color: #61715c; }
 .menu-card-title { font-size: 19px; font-weight: 650; letter-spacing: -.035em; }
