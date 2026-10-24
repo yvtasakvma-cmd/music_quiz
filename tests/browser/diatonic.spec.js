@@ -106,11 +106,13 @@ test('84th question, enharmonic spelling, round restart and 320px layout', async
   await expect(page.locator('.lesson-number')).toHaveText('84 / 84');
   await selectNotes(page, [49, 52, 56, 58]);
   await page.locator('#grade').tap();
-  await expect(page.locator('#results')).toContainText('正解！');
-  await expect(page.locator('.expected-notes')).toHaveText('正解：A♯ · C♯ · E · G♯');
-  await expect(page.locator('#next')).toContainText('次の84問へ');
+  await expect(page.locator('#round-results')).toBeVisible();
+  await expect(page.locator('#round-correct-count')).toHaveText('1');
+  await expect(page.locator('#round-unanswered-count')).toHaveText('83');
+  await page.locator('.round-question[data-id="83"] > summary').tap();
+  await expect(page.locator('.round-question[data-id="83"] .round-expected')).toHaveText('正解：A♯ · C♯ · E · G♯');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.locator('#next').tap();
+  await page.locator('#round-restart').tap();
   await expect(page.locator('#key-name')).toHaveText('C');
   await expect(page.locator('#degree-name')).toHaveText('Ⅰ');
   await expect(page.locator('.lesson-number')).toHaveText('1 / 84');

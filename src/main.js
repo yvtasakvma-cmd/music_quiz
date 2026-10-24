@@ -1,18 +1,12 @@
 import './style.css';
-import { KEYS, MINOR_KEYS, DEGREES, DIATONIC_DEGREES, noteName, cadence, diatonicChord, majorScale, naturalMinorScale, canConfirm, isCorrect, drawKey, drawDiatonic, drawRelative, relativeQuestion } from './music.js';
+import { KEYS, MINOR_KEYS, DEGREES, DIATONIC_DEGREES, noteName, canConfirm, isCorrect, drawKey, relativeQuestion } from './music.js';
+import { QUIZ_MODES as MODES, questionFor, restoreOutcomes, recordOutcome, summarizeRound } from './quiz.js';
 import { playChord, playScale, stopPlayback } from './audio.js';
 
 const icons = {
   sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z" stroke-linejoin="round"/><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" stroke-linecap="round"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-};
-const MODES = {
-  cadence: { label: 'ケーデンスクイズ', count: 4, slots: 3, storage: 'cadence-key-progress-v1' },
-  diatonic: { label: 'メジャーダイアトニッククイズ', count: 4, slots: 1, storage: 'major-diatonic-progress-v1', total: 84, draw: drawDiatonic },
-  relative: { label: '平行短調・長調クイズ', count: 1, slots: 1, storage: 'relative-key-progress-v1', total: 24, draw: drawRelative },
-  major: { label: 'メジャースケール', count: 7, slots: 1, storage: 'scale-major-key-progress-v1' },
-  minor: { label: 'マイナースケール', count: 7, slots: 1, storage: 'scale-minor-key-progress-v1' },
 };
 const sessions = new Map();
 let mode = null;
@@ -36,31 +30,30 @@ function readProgress() {
     const validId = (id) => Number.isInteger(id) && id >= 0 && id < questionCount();
     if (progress && validId(progress.previous) &&
       Array.isArray(progress.remaining) && new Set(progress.remaining).size === progress.remaining.length &&
-      progress.remaining.every((id) => validId(id) && id !== progress.previous)) return progress;
+      progress.remaining.every((id) => validId(id) && id !== progress.previous)) return {
+        ...progress, outcomes: restoreOutcomes(mode, progress.outcomes),
+        completed: progress.completed === true && progress.remaining.length === 0,
+      };
   } catch { /* Practice still works when browser storage is unavailable. */ }
   return {};
 }
 function saveProgress() {
   try {
-    localStorage.setItem(config().storage, JSON.stringify({ previous: previousQuestion(), remaining: state.remaining }));
+    localStorage.setItem(config().storage, JSON.stringify({ previous: previousQuestion(), remaining: state.remaining, outcomes: state.outcomes, completed: state.completed }));
   } catch { /* Keep the non-repeating deck in memory if storage is unavailable. */ }
 }
-function createState() {
-  const progress = readProgress();
-  const draw = drawQuestion(progress.remaining, progress.previous);
+function createState(fresh = false, previous = null) {
+  const progress = fresh ? { previous } : readProgress();
+  // Keep the final question available until it is answered, and keep a finished
+  // round on its results screen until the user explicitly starts another round.
+  const draw = progress.remaining?.length === 0 ? drawQuestion([progress.previous], null) : drawQuestion(progress.remaining, progress.previous);
   return { key: quizKey(draw.key), degree: draw.degree, questionId: draw.questionId, remaining: draw.remaining, current: 0,
+    outcomes: progress.outcomes || [], completed: progress.completed || false,
     drafts: Array.from({ length: config().slots }, () => []),
     answers: Array(config().slots).fill(null), result: null, feedback: '' };
 }
 function items() {
-  if (isCadence()) return cadence(state.key);
-  if (isDiatonic()) return [diatonicChord(state.key, state.degree)];
-  if (isRelative()) {
-    const { fromMajor, answerKey } = relativeQuestion(state.questionId);
-    return [{ symbol: `${answerKey.name}${fromMajor ? 'マイナー' : 'メジャー'}`, notes: [answerKey.name], pitches: [answerKey.tonic] }];
-  }
-  const notes = (mode === 'minor' ? naturalMinorScale : majorScale)(state.key);
-  return [{ symbol: `${state.key.name} ${config().label}`, notes: notes.map((note) => note.name), pitches: notes.map((note) => note.pitch) }];
+  return questionFor(mode, previousQuestion()).items;
 }
 
 document.querySelector('#app').innerHTML = `
@@ -107,6 +100,7 @@ document.querySelector('#app').innerHTML = `
       <div class="submit-area"><button id="grade" class="button grade-button"><span>回答する</span>${icons.arrow}</button><p id="progress-help" aria-live="polite"></p></div>
       <section id="results" class="results" aria-live="polite" aria-label="採点結果" hidden></section>
     </div>
+    <section id="round-results" aria-labelledby="round-title" hidden></section>
     <footer class="footer"><span id="footer-label">CHORDS & SCALES / A LITTLE PRACTICE EVERY DAY</span><details><summary>使い方・iPhone に追加</summary><div><p id="mode-help">メニューからコードやスケールのクイズを選んで練習します。</p><p>鍵盤は再タップで解除。オクターブは自由ですが、同じ音名を重ねずに選びます。各クイズの出題履歴は別々に保存されます。</p><p>iPhone は Safari の共有メニューから「ホーム画面に追加」。初回の読み込み後はオフラインでも練習できます。音が出ないときは本体の音量・消音設定も確認してください。</p><p id="offline-status">オフライン機能は本番版で有効になります。</p></div></details></footer>
     <div id="toast" class="toast" role="status" hidden></div>
   </main>`;
@@ -142,8 +136,10 @@ function startQuiz(nextMode) {
     sessions.set(mode, state);
     saveProgress();
   } else state = sessions.get(mode);
+  if (state.completed) { showRoundResults(); return; }
   $('#menu').hidden = true;
   $('#quiz').hidden = false;
+  $('#round-results').hidden = true;
   clearToast();
   update();
   window.scrollTo(0, 0);
@@ -153,6 +149,7 @@ function showMenu() {
   stopPlayback();
   clearToast();
   $('#quiz').hidden = true;
+  $('#round-results').hidden = true;
   $('#menu').hidden = false;
   $('#footer-label').textContent = 'CHORDS & SCALES / A LITTLE PRACTICE EVERY DAY';
   $('#mode-help').textContent = 'メニューからコードやスケールのクイズを選んで練習します。';
@@ -165,6 +162,38 @@ $('#menu').addEventListener('click', (event) => {
 });
 $('#back-menu').addEventListener('click', showMenu);
 $('.brand').addEventListener('click', (event) => { event.preventDefault(); showMenu(); });
+
+function showRoundResults() {
+  stopPlayback();
+  clearToast();
+  const groups = summarizeRound(mode, state.outcomes);
+  const labels = { incorrect: '間違えた問題', correct: '正解した問題', unanswered: '未回答の問題' };
+  const statuses = { incorrect: '不正解', correct: '正解', unanswered: '未回答' };
+  $('#round-results').innerHTML = `<div class="eyebrow"><span class="tiny-dot"></span> ROUND RESULT</div>
+    <h1 id="round-title" class="round-title" tabindex="-1">一周おつかれさま！</h1>
+    <p class="round-mode">${config().label} · ${questionCount()}問</p>
+    <div class="round-stats"><div class="stat-correct"><strong id="round-correct-count">${groups.correct.length}</strong><span>正解</span></div><div class="stat-incorrect"><strong id="round-incorrect-count">${groups.incorrect.length}</strong><span>不正解</span></div><div><strong id="round-unanswered-count">${groups.unanswered.length}</strong><span>未回答</span></div></div>
+    <p class="round-help">各問題の最初の回答で集計しています。<br>${isCadence() ? '3コードすべて正解で、そのキーの問題を正解とします。<br>' : ''}問題をタップすると、回答と正解を確認できます。</p>
+    ${['incorrect', 'correct', 'unanswered'].map((status) => `<section class="round-group" data-group="${status}" aria-label="${labels[status]}"><h2>${labels[status]}<span>${groups[status].length}問</span></h2>${groups[status].length ? `<div class="round-list">${groups[status].map((entry) => `<details class="round-question" data-id="${entry.id}" data-status="${status}"><summary><span class="round-status">${statuses[status]}</span><span class="round-question-title">${entry.title}</span>${isCadence() && entry.results ? `<span class="round-score">${entry.results.filter(Boolean).length}/3</span>` : ''}</summary><div class="round-answer-details">${entry.items.map((item, index) => `<div class="round-answer-item"><p class="round-answer-name">${item.degree ? `${item.degree} · ` : ''}${item.symbol}${entry.results ? `<span class="round-item-status">${entry.results[index] ? '正解' : '不正解'}</span>` : ''}</p><p class="round-expected">正解：${item.notes.join(' · ')}</p><p class="round-submitted">初回の回答：${entry.answers ? [...entry.answers[index]].sort((a, b) => a - b).map((midi) => noteName(midi, entry.key.flats)).join(' · ') : '回答の記録がありません'}</p></div>`).join('')}</div></details>`).join('')}</div>` : '<p class="round-empty">該当する問題はありません。</p>'}</section>`).join('')}
+    <div class="round-actions"><button id="round-restart" class="button confirm-button">もう一回やる ${icons.arrow}</button><button id="round-menu" class="button retry-button">メニューに戻る</button></div>`;
+  $('#menu').hidden = true;
+  $('#quiz').hidden = true;
+  $('#round-results').hidden = false;
+  $('#footer-label').textContent = 'ROUND COMPLETE / KEEP PRACTICING';
+  window.scrollTo(0, 0);
+  $('#round-title').focus({ preventScroll: true });
+}
+
+$('#round-results').addEventListener('click', (event) => {
+  if (event.target.closest('#round-menu')) { showMenu(); return; }
+  if (event.target.closest('#round-restart')) {
+    const previous = previousQuestion();
+    state = createState(true, previous);
+    sessions.set(mode, state);
+    saveProgress();
+    startQuiz(mode);
+  }
+});
 
 function update() {
   const { key, remaining, current, answers, result } = state;
@@ -227,7 +256,7 @@ function renderResults() {
   const expected = items();
   const count = result.filter(Boolean).length;
   const heading = isCadence() ? count === 3 ? 'すべて正解！' : 'あと少し。音を見比べよう。' : result[0] ? '正解！' : 'あと少し。音を見比べよう。';
-  $('#results').innerHTML = `<div class="result-heading"><span class="eyebrow">RESULT</span><h2>${heading}</h2><p>${isCadence() ? `${count} / 3 コード正解` : result[0] ? `${config().count}つの音を選べました。` : `正解の${config().count}音と比べてみよう。`}</p></div><div class="result-chords">${expected.map((item, index) => `<div class="result-chord ${result[index] ? 'is-correct' : 'is-incorrect'}"><span class="result-icon" aria-label="${result[index] ? '正解' : '不正解'}">${result[index] ? '✓' : '×'}</span><div><div class="result-chord-title">${isCadence() ? `<span>${DEGREES[index]}</span>` : isDiatonic() ? `<span>${DIATONIC_DEGREES[state.degree]}</span>` : ''}<strong>${item.symbol}</strong></div><p class="expected-notes">正解：${item.notes.join(' · ')}</p>${result[index] ? '' : `<p class="your-notes">回答：${[...answers[index]].sort((a, b) => a - b).map((midi) => noteName(midi, key.flats)).join(' · ')}</p>`}</div><button class="listen-answer" data-listen="${index}" aria-label="正解の ${item.symbol} を聴く">${icons.sound}</button></div>`).join('')}</div><div class="result-actions"><button id="retry" class="button retry-button">${isDiatonic() ? '同じ問題でもう一度' : '同じキーでもう一度'}</button><button id="next" class="button confirm-button">${remaining.length ? '次の問題' : `次の${questionCount()}問へ`} ${icons.arrow}</button></div>`;
+  $('#results').innerHTML = `<div class="result-heading"><span class="eyebrow">RESULT</span><h2>${heading}</h2><p>${isCadence() ? `${count} / 3 コード正解` : result[0] ? `${config().count}つの音を選べました。` : `正解の${config().count}音と比べてみよう。`}</p></div><div class="result-chords">${expected.map((item, index) => `<div class="result-chord ${result[index] ? 'is-correct' : 'is-incorrect'}"><span class="result-icon" aria-label="${result[index] ? '正解' : '不正解'}">${result[index] ? '✓' : '×'}</span><div><div class="result-chord-title">${isCadence() ? `<span>${DEGREES[index]}</span>` : isDiatonic() ? `<span>${DIATONIC_DEGREES[state.degree]}</span>` : ''}<strong>${item.symbol}</strong></div><p class="expected-notes">正解：${item.notes.join(' · ')}</p>${result[index] ? '' : `<p class="your-notes">回答：${[...answers[index]].sort((a, b) => a - b).map((midi) => noteName(midi, key.flats)).join(' · ')}</p>`}</div><button class="listen-answer" data-listen="${index}" aria-label="正解の ${item.symbol} を聴く">${icons.sound}</button></div>`).join('')}</div><div class="result-actions"><button id="retry" class="button retry-button">${isDiatonic() ? '同じ問題でもう一度' : '同じキーでもう一度'}</button><button id="next" class="button confirm-button">次の問題 ${icons.arrow}</button></div>`;
 }
 function editCurrent() {
   state.answers[state.current] = null;
@@ -284,6 +313,10 @@ $('#grade').addEventListener('click', () => {
   }
   if (state.answers.some((answer) => !answer)) return;
   state.result = items().map((item, index) => isCorrect(state.answers[index], item));
+  state.outcomes = recordOutcome(state.outcomes, previousQuestion(), state.answers);
+  state.completed = state.remaining.length === 0;
+  saveProgress();
+  if (state.completed) { showRoundResults(); return; }
   update();
   $('#results').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
 });

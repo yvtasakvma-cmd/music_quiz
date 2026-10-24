@@ -176,12 +176,14 @@ test('quiz has no key picker and never repeats a key before completing the round
     await expect(page.locator('.lesson-number')).toHaveText(`${question} / 12`);
     for (let chord = 0; chord < 3; chord++) await submitChord(page, [48, 52, 55, 59]);
     await page.locator('#grade').tap();
-    if (question === 12) await expect(page.locator('#next')).toContainText('次の12問へ');
-    await page.locator('#next').tap();
     if (question === 12) {
+      await expect(page.locator('#round-results')).toBeVisible();
+      await expect(page.locator('#round-incorrect-count')).toHaveText('11');
+      await expect(page.locator('#round-unanswered-count')).toHaveText('1');
+      await page.locator('#round-restart').tap();
       await expect(page.locator('.lesson-number')).toHaveText('1 / 12');
       await expect(page.locator('#key-name')).not.toHaveText(name);
-    }
+    } else await page.locator('#next').tap();
   }
   expect(seen.size).toBe(12);
 });

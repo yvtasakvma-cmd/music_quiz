@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { KEYS, MINOR_KEYS, cadence, diatonicChord, majorScale, naturalMinorScale, canConfirm, isCorrect, noteName, frequency, drawKey, drawDiatonic, drawRelative, relativeQuestion } from '../src/music.js';
+import { QUIZ_MODES, questionFor, restoreOutcomes, recordOutcome, summarizeRound } from '../src/quiz.js';
 
 test('all 12 keys produce ii m7, V7 and I maj7 with the correct intervals', () => {
   for (const key of KEYS) {
@@ -185,4 +186,48 @@ test('relative deck draws all 24 directions without repeats and starts a fresh r
     assert.notEqual(next.questionId, draw.questionId);
     assert.equal(next.remaining.length, 23);
   }
+});
+
+test('round summaries distinguish correct, wrong and unanswered questions in every mode', () => {
+  for (const mode of Object.keys(QUIZ_MODES)) {
+    const total = QUIZ_MODES[mode].total || 12;
+    const outcomes = [];
+    for (let id = 0; id < total; id++) {
+      if (id === 1) continue;
+      const items = questionFor(mode, id).items;
+      const answers = items.map((item) => item.pitches.map((pitch) => pitch + 48));
+      if (id === 0) answers[0][0] = 48 + Array.from({ length: 12 }, (_, pitch) => pitch).find((pitch) => !items[0].pitches.includes(pitch));
+      outcomes.push({ id, answers });
+    }
+    const groups = summarizeRound(mode, outcomes);
+    assert.equal(groups.correct.length, total - 2);
+    assert.deepEqual(groups.incorrect.map((item) => item.id), [0]);
+    assert.deepEqual(groups.unanswered.map((item) => item.id), [1]);
+    assert.equal(groups.incorrect[0].results[0], false);
+    if (mode === 'cadence') assert.deepEqual(groups.incorrect[0].results, [false, true, true]);
+    assert.equal(groups.unanswered[0].answers, null);
+  }
+});
+
+test('round records retain the first answer through edits, retry and storage restoration', () => {
+  const answers = [[48]];
+  let outcomes = recordOutcome([], 0, answers); // C major -> A minor, answered C
+  answers[0][0] = 57;
+  outcomes = recordOutcome(outcomes, 0, [[57]]);
+  assert.equal(outcomes.length, 1);
+  assert.deepEqual(outcomes[0].answers, [[48]]);
+  const restored = restoreOutcomes('relative', JSON.parse(JSON.stringify(outcomes)));
+  const groups = summarizeRound('relative', restored);
+  assert.equal(groups.correct.length, 0);
+  assert.equal(groups.incorrect.length, 1);
+  assert.equal(groups.incorrect[0].title, 'Cメジャーの平行短調');
+  assert.equal(groups.incorrect[0].items[0].symbol, 'Aマイナー');
+});
+
+test('corrupt or legacy history is never invented as a correct answer', () => {
+  assert.deepEqual(restoreOutcomes('relative', undefined), []);
+  const valid = { id: 0, answers: [[57]] };
+  const records = restoreOutcomes('relative', [valid, { id: 0, answers: [[48]] }, { id: -1, answers: [[57]] }, { id: 24, answers: [[57]] }, { id: 1, answers: [["57"]] }, { id: 2, answers: [[57, 69]] }, { id: 3, answers: [[100]] }, null]);
+  assert.deepEqual(records, [valid]);
+  assert.equal(summarizeRound('major', []).unanswered.length, 12);
 });

@@ -110,10 +110,13 @@ test('24th question works offline on a 320px display and starts a new round', as
   await expect(page.locator('.lesson-number')).toHaveText('24 / 24');
   await page.locator('[data-midi="50"]').tap();
   await page.locator('#grade').tap();
-  await expect(page.locator('.result-chord-title')).toHaveText('Dメジャー');
-  await expect(page.locator('#next')).toContainText('次の24問へ');
+  await expect(page.locator('#round-results')).toBeVisible();
+  await expect(page.locator('#round-correct-count')).toHaveText('1');
+  await expect(page.locator('#round-unanswered-count')).toHaveText('23');
+  await page.locator('.round-question[data-id="23"] > summary').tap();
+  await expect(page.locator('.round-question[data-id="23"] .round-answer-name')).toContainText('Dメジャー');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.locator('#next').tap();
+  await page.locator('#round-restart').tap();
   await expect(page.locator('.lesson-number')).toHaveText('1 / 24');
   await expect(page.locator('#key-name')).toHaveText('C');
   await expect(page.locator('#relative-title')).toHaveText('平行短調は？');

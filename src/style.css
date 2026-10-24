@@ -158,6 +158,40 @@ details div { text-align: left; color: #77816f; background: #eff1e8; padding: 4p
 .listen-answer svg { width: 18px; }
 .result-actions { display: grid; gap: 10px; margin-top: 18px; }
 .retry-button { border: 1px solid #d7ddce; background: transparent; color: #708368; font-size: 12px; }
+.round-title { display: block; white-space: normal; font-size: 28px; line-height: 1.6; margin-top: 14px; }
+.round-mode { font-size: 12px; color: #7c8774; margin: 10px 0 22px; }
+.round-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid #dfe4d7; border-radius: 13px; background: #fff; padding: 17px 0; }
+.round-stats > div { display: flex; flex-direction: column; align-items: center; gap: 5px; color: #92998b; border-left: 1px solid #edf0e6; }
+.round-stats > div:first-child { border-left: 0; }
+.round-stats strong { font-size: 30px; font-weight: 650; line-height: 1.25; }
+.round-stats span { font-size: 11px; }
+.round-stats .stat-correct { color: #52755a; }
+.round-stats .stat-incorrect { color: #bd6656; }
+.round-help { font-size: 10px; color: #87917d; line-height: 1.9; margin: 13px 2px 24px; }
+.round-group { margin-top: 23px; }
+.round-group > h2 { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; margin: 0 2px 11px; }
+.round-group > h2 > span { font-size: 11px; color: #89937f; font-weight: 400; }
+.round-list { border: 1px solid #e0e5d9; border-radius: 10px; overflow: hidden; background: #fff; }
+.round-question { margin: 0; border-top: 1px solid #e8ece1; }
+.round-question:first-child { border-top: 0; }
+.round-question > summary { display: flex; align-items: center; gap: 9px; padding: 13px 11px; min-height: 55px; text-align: left; list-style: none; }
+.round-question > summary::-webkit-details-marker { display: none; }
+.round-question > summary::after { content: '+'; color: #8b987e; font-size: 16px; }
+.round-question[open] > summary::after { content: '−'; }
+.round-status { flex-shrink: 0; font-size: 9px; background: #edf2e7; color: #507652; padding: 3px 6px; border-radius: 4px; }
+[data-status="incorrect"] .round-status { background: #fce9e3; color: #b75d4b; }
+[data-status="unanswered"] .round-status { background: #f1f2ed; color: #909589; }
+.round-question-title { flex: 1; min-width: 0; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.round-score { font-size: 10px; color: #98a08e; white-space: nowrap; }
+.round-question .round-answer-details { background: #f7f8f2; padding: 0 13px; }
+.round-question .round-answer-item { background: transparent; padding: 10px 0; border-top: 1px solid #e8ece0; }
+.round-answer-name { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; font-size: 12px; color: #4c654b; font-weight: 600; margin: 0; }
+.round-item-status { font-size: 9px; font-weight: 400; color: #808f73; }
+.round-expected, .round-submitted { font-size: 10px; line-height: 1.8; margin: 5px 0 0; overflow-wrap: anywhere; }
+.round-expected { color: #748a69; }
+.round-submitted { color: #99917f; }
+.round-empty { color: #9aa18f; font-size: 11px; margin: 12px 2px; }
+.round-actions { display: grid; gap: 10px; margin: 30px 0 10px; }
 
 @media (min-width: 600px) {
   .app-shell { padding-top: 38px; padding-bottom: 38px; }
