@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "Cadence — ii–V–I の練習",
+  "short_name": "Cadence",
+  "description": "鍵盤で和音をつくる、ii–V–I の音楽クイズ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8f7f2",
+  "theme_color": "#f8f7f2",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
